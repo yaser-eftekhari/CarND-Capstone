@@ -54,7 +54,7 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        min_speed=25/2.24
+        min_speed = 25/2.24
         self.controller = Controller(wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle) #<Arguments you wish to provide>)
 
         self.dbw_enabled = False
@@ -70,22 +70,25 @@ class DBWNode(object):
         self.loop()
 
     def twist_cb(self, msg):
-        if self.target_ang_vel_filt==0:
+        if self.target_ang_vel_filt == 0:
             self.target_ang_vel_filt = (msg.twist.angular.z*self.target_ang_vel_filt_size)
             self.target_ang_vel = msg.twist.angular.z
             self.target_lin_vel = msg.twist.linear.x
-            #self.target_lin_vel = 25/2.24
+            # self.target_lin_vel = 25/2.24
         else:
             self.target_ang_vel_filt = self.target_ang_vel_filt + msg.twist.angular.z - self.target_ang_vel
             self.target_ang_vel = self.target_ang_vel_filt/self.target_ang_vel_filt_size
             self.target_lin_vel = msg.twist.linear.x
-            #self.target_lin_vel = 25/2.24
-        if self.dbw_enabled:
-            rospy.logwarn('target lin vel {} ( {} ) ang vel {} ( {} )'.format(self.target_lin_vel, msg.twist.linear.x, self.target_ang_vel, msg.twist.angular.z))
+            # self.target_lin_vel = 25/2.24
+        # if self.dbw_enabled:
+        #     rospy.logwarn('target lin vel {} ( {} ) ang vel {} ( {} )'.format(self.target_lin_vel,
+        #                                                                       msg.twist.linear.x,
+        #                                                                       self.target_ang_vel,
+        #                                                                       msg.twist.angular.z))
 
     def curr_vel_cb(self, msg):
-        if self.dbw_enabled:
-            rospy.logwarn('Curr Lin Vel {}'.format(msg.twist.linear.x))
+        # if self.dbw_enabled:
+        #     rospy.logwarn('Curr Lin Vel {}'.format(msg.twist.linear.x))
         self.current_lin_vel = msg.twist.linear.x
 
     def dbw_enabled_cb(self, msg):
@@ -104,7 +107,7 @@ class DBWNode(object):
             #                                                     <any other argument you need>)
             # if <dbw is enabled>:
             if self.dbw_enabled:
-                rospy.logwarn('throttle {} brake {} steer {}'.format(throttle, brake, steering))
+                # rospy.logwarn('throttle {} brake {} steer {}'.format(throttle, brake, steering))
                 self.publish(throttle, brake, steering)
             rate.sleep()
 
