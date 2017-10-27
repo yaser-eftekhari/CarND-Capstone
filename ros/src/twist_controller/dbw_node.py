@@ -5,7 +5,7 @@ from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped
 import math
-
+from copy import copy, deepcopy
 from twist_controller import Controller
 
 '''
@@ -54,13 +54,13 @@ class DBWNode(object):
                                          BrakeCmd, queue_size=1)
 
         # TODO: Create `TwistController` object
-        min_speed=40/2.24
+        min_speed=25/2.24
         self.controller = Controller(wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle) #<Arguments you wish to provide>)
 
         self.dbw_enabled = False
         self.target_ang_vel_filt = 0.
         self.target_ang_vel = 0
-        self.target_ang_vel_filt_size = 4.
+        self.target_ang_vel_filt_size = 8.
         self.target_lin_vel = 0.
         self.current_lin_vel = 0.
         # TODO: Subscribe to all the topics you need to
@@ -73,15 +73,15 @@ class DBWNode(object):
         if self.target_ang_vel_filt==0:
             self.target_ang_vel_filt = (msg.twist.angular.z*self.target_ang_vel_filt_size)
             self.target_ang_vel = msg.twist.angular.z
-            #self.target_lin_vel = msg.twist.linear.x
-            self.target_lin_vel = 40/2.24
+            self.target_lin_vel = msg.twist.linear.x
+            #self.target_lin_vel = 25/2.24
         else:
             self.target_ang_vel_filt = self.target_ang_vel_filt + msg.twist.angular.z - self.target_ang_vel
             self.target_ang_vel = self.target_ang_vel_filt/self.target_ang_vel_filt_size
-            #self.target_lin_vel = msg.twist.linear.x
-            self.target_lin_vel = 40/2.24
+            self.target_lin_vel = msg.twist.linear.x
+            #self.target_lin_vel = 25/2.24
         if self.dbw_enabled:
-            rospy.logwarn('target lin vel {} ( {} ) ang vel {}'.format(self.target_lin_vel, msg.twist.linear.x, self.target_ang_vel))
+            rospy.logwarn('target lin vel {} ( {} ) ang vel {} ( {} )'.format(self.target_lin_vel, msg.twist.linear.x, self.target_ang_vel, msg.twist.angular.z))
 
     def curr_vel_cb(self, msg):
         if self.dbw_enabled:

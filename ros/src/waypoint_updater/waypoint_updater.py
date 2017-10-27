@@ -76,18 +76,13 @@ class WaypointUpdater(object):
         return i        
 
     def get_rough_path(self, curr_pose, curr_i, off_i):
-        path = Lane()
+        path = deepcopy(Lane())
         if off_i< curr_i:
             off_i += len(self.base_wp_list)
-        wp = Waypoint()
-        wp.pose = curr_pose
-        wp.twist = TwistStamped()
-        #path.waypoints.append(wp)
+
         for i in range(curr_i, off_i): 
             i = i % len(self.base_wp_list)
-            wp = Waypoint()
-            wp.pose = self.base_wp_list[i].pose
-            wp.twist = TwistStamped()
+            wp=deepcopy(self.base_wp_list[i])
             path.waypoints.append(wp)
         rospy.logwarn('pos {} orient {}'.format(path.waypoints[0].pose.pose.position,path.waypoints[0].pose.pose.orientation))
         return path
@@ -118,7 +113,7 @@ class WaypointUpdater(object):
     def waypoints_cb(self, waypoints):
         # TODO: Implement
         rospy.logwarn('Got waypoints_cb of size {}'.format(len(waypoints.waypoints)))
-        self.base_wp_list = copy(waypoints.waypoints)
+        self.base_wp_list = deepcopy(waypoints.waypoints)
         #rospy.logwarn ('{} : {} '.format(self.base_wp_count, waypoints))
 
     def traffic_cb(self, msg):
