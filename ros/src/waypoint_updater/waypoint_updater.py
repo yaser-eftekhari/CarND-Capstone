@@ -6,7 +6,6 @@ from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 from copy import copy,deepcopy
 import sys
-
 import math
 
 '''
@@ -57,7 +56,7 @@ class WaypointUpdater(object):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         mindl = 100000000
         minidx = 0
-        #optimize to binary seach TBD
+        # optimize to binary seach TBD
         for idx in range(len(self.base_wp_list)):
             dist = dl(curr_pose.pose.position, self.base_wp_list[idx].pose.pose.position)
             if mindl > dist:
@@ -70,8 +69,10 @@ class WaypointUpdater(object):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         d = 0
         i = (curr_i + 1) % len(self.base_wp_list)
+        last_i = curr_i    
         while d < dist:
-            d += dl(self.base_wp_list[curr_i].pose.pose.position, self.base_wp_list[i].pose.pose.position)
+            d += dl(self.base_wp_list[last_i].pose.pose.position, self.base_wp_list[i].pose.pose.position)
+            last_i = i
             i = (i + 1) % len(self.base_wp_list)
         return i        
 
@@ -84,7 +85,7 @@ class WaypointUpdater(object):
             i = i % len(self.base_wp_list)
             wp = deepcopy(self.base_wp_list[i])
             path.waypoints.append(wp)
-        self._log('pos {} orient {}'.format(path.waypoints[0].pose.pose.position,path.waypoints[0].pose.pose.orientation))
+        # self._log('pos {} orient {}'.format(path.waypoints[0].pose.pose.position,path.waypoints[0].pose.pose.orientation))
         return path
 
     def pose_cb(self, msg):
@@ -106,7 +107,8 @@ class WaypointUpdater(object):
         self.final_waypoints_pub.publish(final_wp)
         '''
         curr_i = self.get_base_idx(self.curr_pose)
-        off_i = self.get_base_off_idx(curr_i, 60) # 60m gets more points. TBD Spline
+        lookahead_dist = max(1.5* self.get_waypoint_velocity(self.base_wp_list[curr_i]), 15)
+        off_i = self.get_base_off_idx(curr_i, lookahead_dist) # 60m gets more points. TBD Spline
         final_wp = self.get_rough_path(self.curr_pose, curr_i, off_i)
         self.final_waypoints_pub.publish(final_wp)
 
