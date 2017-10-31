@@ -6,7 +6,6 @@ from styx_msgs.msg import Lane, Waypoint
 from std_msgs.msg import Int32
 from copy import copy,deepcopy
 import sys
-
 import math
 
 '''
@@ -28,6 +27,10 @@ LOOKAHEAD_WPS = 200 # Number of waypoints we will publish. You can change this n
 
 
 class WaypointUpdater(object):
+    def _log(self, msg):
+        if self.logEnable:
+            rospy.logwarn(msg)
+
     def __init__(self):
         rospy.init_node('waypoint_updater')
 
@@ -40,15 +43,11 @@ class WaypointUpdater(object):
 
         self.final_waypoints_pub = rospy.Publisher('final_waypoints', Lane, queue_size=1)
 
-        # TODO: Add other member variables you need below
+        self.logEnable = False
         self.base_wp_list = None
         self.curr_pose = None
         self.curr_speed = 30
 
-        rospy.logdebug('WaypointUpdater debug')
-        rospy.loginfo('WaypointUpdater info')
-        rospy.logwarn('WaypointUpdater warn')
-        print('WaypointUpdater print')
         sys.stdout.flush()
         rospy.spin()
 
@@ -56,7 +55,7 @@ class WaypointUpdater(object):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         mindl = 100000000
         minidx = 0
-        #optimize to binary seach TBD
+        # optimize to binary seach TBD
         for idx in range(len(self.base_wp_list)):
             dist = dl(curr_pose.pose.position, self.base_wp_list[idx].pose.pose.position)
             if mindl > dist:
@@ -69,12 +68,14 @@ class WaypointUpdater(object):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         d = 0
         i = (curr_i + 1) % len(self.base_wp_list)
+        last_i = curr_i    
         while d < dist:
-            d += dl(self.base_wp_list[curr_i].pose.pose.position, self.base_wp_list[i].pose.pose.position)
+            d += dl(self.base_wp_list[last_i].pose.pose.position, self.base_wp_list[i].pose.pose.position)
+            last_i = i
             i = (i + 1) % len(self.base_wp_list)
         return i        
 
-    def get_rough_path(self, curr_i, off_i):
+    def get_rough_path(self, curr_pose, curr_i, off_i):
         path = Lane()
         if off_i < curr_i:
             off_i += len(self.base_wp_list)
@@ -83,11 +84,11 @@ class WaypointUpdater(object):
             i = i % len(self.base_wp_list)
             wp = deepcopy(self.base_wp_list[i])
             path.waypoints.append(wp)
-        # rospy.logwarn('pos {} \norient {}'.format(path.waypoints[0].pose.pose.position, path.waypoints[0].pose.pose.orientation))
+        # self._log('pos {} orient {}'.format(path.waypoints[0].pose.pose.position,path.waypoints[0].pose.pose.orientation))
         return path
 
     def pose_cb(self, msg):
-        # TODO: Implement
+        # Implement
         # rospy.logwarn('Got pose {}'.format(msg))
         self.curr_pose = msg
         if self.base_wp_list is None:
@@ -105,15 +106,15 @@ class WaypointUpdater(object):
         self.final_waypoints_pub.publish(final_wp)
         '''
         curr_i = self.get_base_idx(self.curr_pose)
-        off_i = self.get_base_off_idx(curr_i, 30)
-        final_wp = self.get_rough_path(curr_i, off_i)
+        lookahead_dist = max(1.5* self.get_waypoint_velocity(self.base_wp_list[curr_i]), 15)
+        off_i = self.get_base_off_idx(curr_i, lookahead_dist) # 60m gets more points. TBD Spline
+        final_wp = self.get_rough_path(self.curr_pose, curr_i, off_i)
         self.final_waypoints_pub.publish(final_wp)
 
     def waypoints_cb(self, waypoints):
-        # TODO: Implement
-        rospy.logwarn('Got waypoints_cb of size {}'.format(len(waypoints.waypoints)))
+        # Implement
+        self._log('Got waypoints_cb of size {}'.format(len(waypoints.waypoints)))
         self.base_wp_list = deepcopy(waypoints.waypoints)
-        #rospy.logwarn ('{} : {} '.format(self.base_wp_count, waypoints))
 
     def traffic_cb(self, msg):
         # TODO: Callback for /traffic_waypoint message. Implement
