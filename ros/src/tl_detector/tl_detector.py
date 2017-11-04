@@ -57,7 +57,7 @@ class TLDetector(object):
         self.light_classifier = TLClassifier()
         self.listener = tf.TransformListener()
 
-        self.logEnable = True
+        self.logEnable = False
         self.useTrafficLightsDebugEnable = True
         self.saveImgEnable = False
         self.saveImgCount = self.saveRecCount = 0
@@ -75,6 +75,7 @@ class TLDetector(object):
         self.last_wp = -1
         self.state_count = 0
         self.last_car_position = 0
+        self.stop_zone = 50.
         self._log('Stop Line Positions: {}'.format(self.config['stop_line_positions']))
         rospy.spin()
 
@@ -174,7 +175,7 @@ class TLDetector(object):
 
     def get_closest_tl_stop(self, curr_i, stop_line_positions):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
-        stop_zone = 100.
+        
         step = 20
         stop_pose = PoseStamped()
         for i in range(len(stop_line_positions)):
@@ -183,8 +184,9 @@ class TLDetector(object):
             stop_pose.pose.position.z = 0
             d = dl(self.waypoints[curr_i].pose.pose.position, stop_pose.pose.position )
             self._log('Stop Light {} d {} curr_wp {} x {} y {}'.format(i, d, curr_i, stop_pose.pose.position.x, stop_pose.pose.position.y))
-            if d < stop_zone:
-                stop_i = self.get_closest_waypoint(stop_pose, start_idx=curr_i, max_dist=stop_zone)
+            if d < self.stop_zone:
+                #curr_i = (curr_i -3 + len(self.waypoints)) % len(self.waypoints)
+                stop_i = self.get_closest_waypoint(stop_pose, start_idx=curr_i, max_dist=self.stop_zone)
                 if stop_i >= 0:
                     self._log('In Zone Stop Light {} wp {} x {} y {}'.format(i, stop_i, stop_pose.pose.position.x, stop_pose.pose.position.y))
                     return stop_i, True
@@ -259,6 +261,8 @@ class TLDetector(object):
 
         if light:
             state = self.get_light_state(light_wp)
+            if state == TrafficLight.YELLOW:
+                state = TrafficLight.RED
             return light_wp, state
         return -1, TrafficLight.UNKNOWN
 
