@@ -18,8 +18,8 @@ import math
 STATE_COUNT_THRESHOLD = 1
 
 class TLDetector(object):
-    def _log(self, msg):
-        if self.logEnable:
+    def _log(self, msg, force=False):
+        if self.logEnable or force:
             rospy.logwarn(msg)
 
     def _getNextRecordName(self):
@@ -33,6 +33,7 @@ class TLDetector(object):
         self.pose = None
         self.waypoints = None
         self.camera_image = None
+        self.cv_image = None
         self.lights = []
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
@@ -77,6 +78,7 @@ class TLDetector(object):
         self.last_car_position = 0
         self.stop_zone = 50.
         self._log('Stop Line Positions: {}'.format(self.config['stop_line_positions']))
+
         rospy.spin()
 
     def pose_cb(self, msg):
@@ -98,6 +100,8 @@ class TLDetector(object):
         """
         self.has_image = True
         self.camera_image = msg
+        self.cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+
         light_wp, state = self.process_traffic_lights()
 
         '''
@@ -211,6 +215,10 @@ class TLDetector(object):
         else:
             return lights[minidx].state
 
+    def classify_light(self):
+        return self.light_classifier.get_classification(self.cv_image)
+        # self._log('bbox {}'.format(boxes), True)
+
     def get_light_state(self, light_wp):
         """Determines the current color of the traffic light
 
@@ -225,18 +233,21 @@ class TLDetector(object):
             self.prev_light_loc = None
             return False
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+
+        # boxes = self.light_classifier.get_classification(cv_image)
+        # self._log('bbox {}'.format(boxes), True)
 
         if self.saveImgEnable:
             if self.saveImgCount % self.saveImgRate == 0:
-                self._log('img size {}'.format(cv_image.shape))    
-                cv2.imwrite(self._getNextRecordName(), cv_image)
+                self._log('img size {}'.format(self.cv_image.shape))
+                cv2.imwrite(self._getNextRecordName(), self.cv_image)
             self.saveImgCount += 1
         if self.useTrafficLightsDebugEnable:
             return self.get_lookup_traffic_lights(light_wp)
         else:
             #Get classification
-            return self.light_classifier.get_classification(cv_image)
+            return self.light_classifier.get_classification(self.cv_image)
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -248,6 +259,8 @@ class TLDetector(object):
 
         """
         light = None
+
+        self.classify_light()
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']
