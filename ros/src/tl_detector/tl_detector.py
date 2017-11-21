@@ -15,7 +15,7 @@ from os import makedirs, remove
 from glob import glob
 import math
 
-STATE_COUNT_THRESHOLD = 1
+STATE_COUNT_THRESHOLD = 0
 
 class TLDetector(object):
     def _log(self, msg, force=False):
@@ -55,7 +55,8 @@ class TLDetector(object):
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        # self.light_classifier = TLClassifier()
+        self.light_classifier = None
         self.listener = tf.TransformListener()
 
         self.logEnable = False
@@ -77,8 +78,12 @@ class TLDetector(object):
         self.state_count = 0
         self.last_car_position = 0
         self.stop_zone = 50.
+        self.stop_zone_wp = 15
 
-        # self.traffic_light_wps = self.get_traffic_light_waypoints(self.config['stop_line_positions'])
+        self.traffic_light_wps = None
+        self.waypoints_cached = False
+
+        self.total_waypoints = None
 
         self._log('Stop Line Positions: {}'.format(self.config['stop_line_positions']))
 
@@ -89,6 +94,12 @@ class TLDetector(object):
 
     def waypoints_cb(self, waypoints):
         self.waypoints = waypoints.waypoints
+        self.total_waypoints = len(self.waypoints)
+        self.traffic_light_wps = self.get_traffic_light_waypoints(self.config['stop_line_positions'])
+        self.light_classifier = TLClassifier()
+        self.waypoints_cached = True
+        self._log('Waypoints received', True)
+
 
     def traffic_cb(self, msg):
         self.lights = msg.lights
@@ -127,7 +138,6 @@ class TLDetector(object):
 
     def get_traffic_light_waypoints(self, stop_line_positions):
         waypoints = []
-        total_waypoints = len(self.waypoints)
         stop_pose = PoseStamped()
         for i in range(len(stop_line_positions)):
             stop_pose.pose.position.x = stop_line_positions[i][0]
@@ -135,11 +145,11 @@ class TLDetector(object):
             stop_pose.pose.position.z = 0
             waypoint_idx = self.get_closest_waypoint(stop_pose)
             # compensate for the +1 in the get_closes_waypoint method
-            waypoint_idx = (waypoint_idx - 1 + total_waypoints) % total_waypoints
+            waypoint_idx = (waypoint_idx - 1 + self.total_waypoints) % self.total_waypoints
             waypoints.append(waypoint_idx)
         return waypoints
 
-    def get_closest_waypoint(self, pose, start_idx=0, max_dist=0):
+    def get_closest_waypoint(self, pose, start_idx=0):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
@@ -152,40 +162,36 @@ class TLDetector(object):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         mindl = 10000000
         minidx = -1
-        idx = start_idx
-        dist_sum = 0
-        #optimize to binary search TBD
-        for a_idx in range(len(self.waypoints)):
-            last_idx = idx
-            idx = (a_idx + start_idx) % len(self.waypoints) 
+
+        start_idx_search = (start_idx - 2 + self.total_waypoints) % self.total_waypoints
+        for a_idx in range(self.total_waypoints):
+            idx = (a_idx + start_idx_search) % self.total_waypoints
             dist = dl(pose.pose.position, self.waypoints[idx].pose.pose.position)
-            dist_sum += dl(self.waypoints[last_idx].pose.pose.position, self.waypoints[idx].pose.pose.position)
             if mindl > dist:
                 minidx = idx
                 mindl = dist
-                if mindl<2.:
-                    break
-            if max_dist>0 and dist_sum>max_dist:
-                return -1
-        minidx = (minidx + 1) % len(self.waypoints)
+            else:
+                break
+
+        minidx = (minidx + 1) % self.total_waypoints
         return minidx
 
     def get_base_off_idx(self, curr_i, dist):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         d = 0
-        i = (curr_i + 1) % len(self.waypoints)
+        i = (curr_i + 1) % self.total_waypoints
         last_i = curr_i
         while d < dist:
             d += dl(self.waypoints[last_i].pose.pose.position, self.waypoints[i].pose.pose.position)
             last_i = i
-            i = (i + 1) % len(self.waypoints)
+            i = (i + 1) % self.total_waypoints
         return i   
 
     def distance(self, waypoints, wp1, wp2):
         dist = 0
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
         if wp2 < wp1:
-            r = range(wp1, len(self.waypoints))
+            r = range(wp1, self.total_waypoints)
             r.extend(range(0,wp2+1))
         else:
             r = range(wp1, wp2+1)
@@ -194,23 +200,14 @@ class TLDetector(object):
             wp1 = i
         return dist
 
-    def get_closest_tl_stop(self, curr_i, stop_line_positions):
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
-        
-        step = 20
-        stop_pose = PoseStamped()
-        for i in range(len(stop_line_positions)):
-            stop_pose.pose.position.x = stop_line_positions[i][0]
-            stop_pose.pose.position.y = stop_line_positions[i][1]
-            stop_pose.pose.position.z = 0
-            d = dl(self.waypoints[curr_i].pose.pose.position, stop_pose.pose.position )
-            self._log('Stop Light {} d {} curr_wp {} x {} y {}'.format(i, d, curr_i, stop_pose.pose.position.x, stop_pose.pose.position.y))
-            if d < self.stop_zone:
-                #curr_i = (curr_i -3 + len(self.waypoints)) % len(self.waypoints)
-                stop_i = self.get_closest_waypoint(stop_pose, start_idx=curr_i, max_dist=self.stop_zone)
-                if stop_i >= 0:
-                    self._log('In Zone Stop Light {} wp {} x {} y {}'.format(i, stop_i, stop_pose.pose.position.x, stop_pose.pose.position.y))
-                    return stop_i, True
+    # def get_closest_tl_stop(self, curr_i, stop_line_positions):
+    def get_closest_tl_stop(self, curr_i):
+        for i in range(len(self.traffic_light_wps)):
+            d_wp = self.traffic_light_wps[i] - curr_i
+            self._log('Stop Light {} d {} curr_wp {}'.format(i, d_wp, curr_i))
+            if 0 <= d_wp < self.stop_zone_wp:
+                self._log('In Zone Stop Light {} light wp {} car wp {}'.format(i, self.traffic_light_wps[i], curr_i), True)
+                return self.traffic_light_wps[i], True
         return -1, False
 
     def get_lookup_traffic_lights(self, light_wp):
@@ -271,14 +268,18 @@ class TLDetector(object):
         light = None
 
         # List of positions that correspond to the line to stop in front of for a given intersection
-        stop_line_positions = self.config['stop_line_positions']
-        if(self.pose and self.waypoints):
+        # stop_line_positions = self.config['stop_line_positions']
+        # if(self.pose and self.waypoints_cached):
+        self._log('waypoints len {}'.format(self.total_waypoints))
+        if(self.pose and self.waypoints_cached):
             car_position = self.get_closest_waypoint(self.pose, start_idx=self.last_car_position)
             self.last_car_position = car_position
-            self._log('Car pos {} x {} y {}'.format(car_position, self.waypoints[car_position].pose.pose.position.x, self.waypoints[car_position].pose.pose.position.y))
+            self._log('Car pos {}'.format(car_position))
+            # self._log('Car pos {} x {} y {}'.format(car_position, self.waypoints[car_position].pose.pose.position.x, self.waypoints[car_position].pose.pose.position.y), True)
             #TODO find the closest visible traffic light (if one exists)
             # light = True
-            light_wp, light = self.get_closest_tl_stop(car_position, stop_line_positions)
+            # light_wp, light = self.get_closest_tl_stop(car_position, stop_line_positions)
+            light_wp, light = self.get_closest_tl_stop(car_position)
 
         if light:
             state = self.get_light_state(light_wp)

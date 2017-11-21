@@ -30,7 +30,8 @@ class Controller(object):
             throttle_pid = 0
         elif (current_lin_vel-target_lin_vel) > -1:
             break_pid = self.breakPID.step( 75*(current_lin_vel-target_lin_vel+1), .05)
-            throttle_pid = max(0.1,1 - abs(steer_pid) - self.throttlePID.step( (current_lin_vel-target_lin_vel+1), .05))
+            throttle_pid = 0
+            # throttle_pid = max(0.1,1 - abs(steer_pid) - self.throttlePID.step( (current_lin_vel-target_lin_vel+1), .05))
         else:
             break_pid = 0
             # When starting from rest, have a lower throttle speed
