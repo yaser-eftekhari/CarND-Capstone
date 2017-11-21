@@ -59,7 +59,7 @@ class TLDetector(object):
         self.listener = tf.TransformListener()
 
         self.logEnable = False
-        self.useTrafficLightsDebugEnable = True
+        self.useTrafficLightsDebugEnable = False
         self.saveImgEnable = False
         self.saveImgCount = self.saveRecCount = 0
         self.saveImgRate = 10 # images are sent 10 times a second. rate=10 saves 1 per second.    
@@ -77,6 +77,9 @@ class TLDetector(object):
         self.state_count = 0
         self.last_car_position = 0
         self.stop_zone = 50.
+
+        # self.traffic_light_wps = self.get_traffic_light_waypoints(self.config['stop_line_positions'])
+
         self._log('Stop Line Positions: {}'.format(self.config['stop_line_positions']))
 
         rospy.spin()
@@ -121,6 +124,20 @@ class TLDetector(object):
         else:
             self.upcoming_red_light_pub.publish(Int32(self.last_wp))
         self.state_count += 1
+
+    def get_traffic_light_waypoints(self, stop_line_positions):
+        waypoints = []
+        total_waypoints = len(self.waypoints)
+        stop_pose = PoseStamped()
+        for i in range(len(stop_line_positions)):
+            stop_pose.pose.position.x = stop_line_positions[i][0]
+            stop_pose.pose.position.y = stop_line_positions[i][1]
+            stop_pose.pose.position.z = 0
+            waypoint_idx = self.get_closest_waypoint(stop_pose)
+            # compensate for the +1 in the get_closes_waypoint method
+            waypoint_idx = (waypoint_idx - 1 + total_waypoints) % total_waypoints
+            waypoints.append(waypoint_idx)
+        return waypoints
 
     def get_closest_waypoint(self, pose, start_idx=0, max_dist=0):
         """Identifies the closest path waypoint to the given position
@@ -215,10 +232,6 @@ class TLDetector(object):
         else:
             return lights[minidx].state
 
-    def classify_light(self):
-        return self.light_classifier.get_classification(self.cv_image)
-        # self._log('bbox {}'.format(boxes), True)
-
     def get_light_state(self, light_wp):
         """Determines the current color of the traffic light
 
@@ -234,9 +247,6 @@ class TLDetector(object):
             return False
 
         # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
-        # boxes = self.light_classifier.get_classification(cv_image)
-        # self._log('bbox {}'.format(boxes), True)
 
         if self.saveImgEnable:
             if self.saveImgCount % self.saveImgRate == 0:
@@ -259,8 +269,6 @@ class TLDetector(object):
 
         """
         light = None
-
-        self.classify_light()
 
         # List of positions that correspond to the line to stop in front of for a given intersection
         stop_line_positions = self.config['stop_line_positions']

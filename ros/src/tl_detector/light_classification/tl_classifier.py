@@ -6,7 +6,13 @@ import cv2
 from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
+    def _log(self, msg, force=False):
+        if self.logEnable or force:
+            rospy.logwarn(msg)
+
     def __init__(self):
+        self.logEnable = False
+
         PATH_TO_MODEL = 'light_classification/ssd.pb'
         # PATH_TO_MODEL = 'light_classification/rfcn.pb' #slow
         # PATH_TO_MODEL = 'light_classification/faster_rcnn.pb' #too slow
@@ -48,6 +54,9 @@ class TLClassifier(object):
         s_boxes = np.squeeze(boxes)
 
         useful_idx = np.where((s_scores > 0.5) & (s_classes == 10))
+        if len(useful_idx) == 0:
+            return TrafficLight.UNKNOWN
+
         useful_box = s_boxes[useful_idx]
 
         h, w, _ = image.shape
@@ -74,17 +83,17 @@ class TLClassifier(object):
         ratio = sums[1] * 1.0 / max(sums[2], 1.0)
 
         if ratio > 10:
-            rospy.logwarn('___GREEN___ {}'.format(ratio))
+            self._log('___GREEN___ {}'.format(ratio))
             return TrafficLight.GREEN
 
         if ratio < 0.3:
-            rospy.logwarn('___RED___ {}'.format(ratio))
+            self._log('___RED___ {}'.format(ratio))
             return TrafficLight.RED
 
         if 0.6 < ratio < 1.5:
-            rospy.logwarn('___YELLOW___ {}'.format(ratio))
+            self._log('___YELLOW___ {}'.format(ratio))
             return TrafficLight.YELLOW
 
-        rospy.logwarn('___UNKNOWN___ {}'.format(ratio))
+        self._log('___UNKNOWN___ {}'.format(ratio))
 
         return TrafficLight.UNKNOWN
