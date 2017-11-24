@@ -143,13 +143,13 @@ class TLDetector(object):
             stop_pose.pose.position.x = stop_line_positions[i][0]
             stop_pose.pose.position.y = stop_line_positions[i][1]
             stop_pose.pose.position.z = 0
-            waypoint_idx = self.get_closest_waypoint(stop_pose)
+            waypoint_idx = self.get_closest_waypoint(stop_pose, force_search=True)
             # compensate for the +1 in the get_closes_waypoint method
             waypoint_idx = (waypoint_idx - 1 + self.total_waypoints) % self.total_waypoints
             waypoints.append(waypoint_idx)
         return waypoints
 
-    def get_closest_waypoint(self, pose, start_idx=0):
+    def get_closest_waypoint(self, pose, start_idx=0, force_search=False):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
@@ -171,7 +171,8 @@ class TLDetector(object):
                 minidx = idx
                 mindl = dist
             else:
-                break
+                if not force_search:
+                    break
 
         minidx = (minidx + 1) % self.total_waypoints
         return minidx
