@@ -23,7 +23,7 @@ as well as to verify your TL classifier.
 TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 '''
 
-LOOKAHEAD_WPS = 50 # Number of waypoints we will publish. You can change this number
+LOOKAHEAD_WPS = 20 # Number of waypoints we will publish. You can change this number
 
 
 class WaypointUpdater(object):
@@ -52,7 +52,6 @@ class WaypointUpdater(object):
         self.curr_pose = None
         self.curr_pose_wp = -1
         self.red_light_wp = -1
-        self.prev_red_light_wp = -1
         # self.loopEnable = True
 
         self.total_base_wp = None
@@ -63,13 +62,15 @@ class WaypointUpdater(object):
         self.new_pose = False
         self.new_traffic = False
 
+        self.stop_zone_wp = 5
+
         # sys.stdout.flush()
         # rospy.spin()
 
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(10) # 10Hz
+        rate = rospy.Rate(20) # 20Hz
         while not rospy.is_shutdown():
             if self.new_pose or self.new_traffic:
                 self.new_pose = False
@@ -103,17 +104,6 @@ class WaypointUpdater(object):
         minidx = (minidx + 1) % self.total_base_wp
 
         return minidx
-
-    # def get_base_off_idx(self, curr_i, dist):
-    #     dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
-    #     d = 0
-    #     i = (curr_i + 1) % len(self.base_wp_list)
-    #     last_i = curr_i
-    #     while d < dist:
-    #         d += dl(self.base_wp_list[last_i].pose.pose.position, self.base_wp_list[i].pose.pose.position)
-    #         last_i = i
-    #         i = (i + 1) % len(self.base_wp_list)
-    #     return i
 
     def clone_waypoint(self, wp):
         output = Waypoint()
@@ -149,8 +139,6 @@ class WaypointUpdater(object):
         for idx in range(curr_i, off_i):
             i = idx % self.total_base_wp
             wp = self.clone_waypoint(self.base_wp_list[i])
-            # if self.loopEnable and self.base_wp_list[i].twist.twist.linear.x==0:
-            #     self.base_wp_list[i].twist.twist.linear.x = 1. # avoid stopping the car with 0 target velocity if loop enabled
             # if self.red_light_wp != -1:
             #     if idx >= self.red_light_wp - 5:
             #         wp.twist.twist.linear.x = 0
@@ -175,25 +163,26 @@ class WaypointUpdater(object):
         if self.red_light_wp == -1:
             return
 
-        # don't stop for a red light that we have already stopped before
-        if self.red_light_wp == self.prev_red_light_wp:
-            return
-
         if self.curr_pose_wp >= self.red_light_wp:
             return
 
         if self.red_light_wp != -1:
             distance_wp = self.red_light_wp - self.curr_pose_wp
-            speed_delta = self.curr_speed * 1.0 / max(distance_wp - 5, 1)
+            speed_delta = self.curr_speed * 1.0 / max(distance_wp - self.stop_zone_wp, 1)
+
+            self._log('distance {}, speed_delta {}'.format(
+                distance_wp, speed_delta
+            ))
 
             for idx in range(LOOKAHEAD_WPS):
                 wp = original_wp[idx]
 
-                if distance_wp - idx <= 5:
+                if distance_wp - idx <= self.stop_zone_wp:
                     wp.twist.twist.linear.x = 0
-                # elif distance_wp - idx <= 15:
+                elif distance_wp - idx <= 3*self.stop_zone_wp:
+                    wp.twist.twist.linear.x = 2
                 else:
-                    wp.twist.twist.linear.x = max(self.curr_speed - idx * speed_delta, 2)
+                    wp.twist.twist.linear.x /= 3.
 
                 # elif idx >= self.red_light_wp - 15:
                 #     wp.twist.twist.linear.x = self.base_wp_list[i].twist.twist.linear.x / 3.
@@ -250,7 +239,7 @@ class WaypointUpdater(object):
         # self.traffic_wp_list = deepcopy(waypoints.waypoints)
 
     def traffic_cb(self, msg):
-        # TODO: Callback for /traffic_waypoint message. Implement
+        # Callback for /traffic_waypoint message. Implement
         # if self.red_light_wp == -1 and msg.data != -1:
         #     if self.prev_red_light_wp == msg.data: # dont stop at same stop twice
         #         return
@@ -271,37 +260,12 @@ class WaypointUpdater(object):
 
         self.new_traffic = True
 
-
     def obstacle_cb(self, msg):
         # TODO: Callback for /obstacle_waypoint message. We will implement it later
         pass
 
     def curr_vel_cb(self, msg):
         self.curr_speed = msg.twist.linear.x
-        if self.curr_speed > 0:
-            self.prev_red_light_wp = -1
-        else:
-            self.prev_red_light_wp = self.red_light_wp
-
-
-    # def get_waypoint_velocity(self, waypoint):
-    #     return waypoint.twist.twist.linear.x
-    #
-    # def set_waypoint_velocity(self, waypoints, waypoint, velocity):
-    #     waypoints[waypoint].twist.twist.linear.x = velocity
-    #
-    # def distance(self, wp1, wp2):
-    #     dist = 0
-    #     dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-    #     if wp2 < wp1:
-    #         r = range(wp1, len(self.base_wp_list))
-    #         r.extend(range(0,wp2+1))
-    #     else:
-    #         r = range(wp1, wp2+1)
-    #     for i in r:
-    #         dist += dl(self.base_wp_list[wp1].pose.pose.position, self.base_wp_list[i].pose.pose.position)
-    #         wp1 = i
-    #     return dist
 
 
 if __name__ == '__main__':

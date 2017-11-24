@@ -78,12 +78,17 @@ class TLDetector(object):
         self.state_count = 0
         self.last_car_position = 0
         self.stop_zone = 50.
-        self.stop_zone_wp = 15
+        self.stop_zone_wp = 20
 
         self.traffic_light_wps = None
         self.waypoints_cached = False
 
         self.total_waypoints = None
+
+        self.tldetect_flag = True
+        self.prev_tl_state = None
+
+        self.log_flag = True
 
         self._log('Stop Line Positions: {}'.format(self.config['stop_line_positions']))
 
@@ -98,7 +103,7 @@ class TLDetector(object):
         self.traffic_light_wps = self.get_traffic_light_waypoints(self.config['stop_line_positions'])
         self.light_classifier = TLClassifier()
         self.waypoints_cached = True
-        self._log('Waypoints received', True)
+        self._log('{} Waypoints received'.format(len(self.waypoints)), True)
 
 
     def traffic_cb(self, msg):
@@ -124,17 +129,8 @@ class TLDetector(object):
         of times till we start using it. Otherwise the previous stable state is
         used.
         '''
-        if self.state != state:
-            self.state_count = 0
-            self.state = state
-        elif self.state_count >= STATE_COUNT_THRESHOLD:
-            self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED else -1
-            self.last_wp = light_wp
-            self.upcoming_red_light_pub.publish(Int32(light_wp))
-        else:
-            self.upcoming_red_light_pub.publish(Int32(self.last_wp))
-        self.state_count += 1
+        light_wp = light_wp if state == TrafficLight.RED else -1
+        self.upcoming_red_light_pub.publish(Int32(light_wp))
 
     def get_traffic_light_waypoints(self, stop_line_positions):
         waypoints = []
@@ -143,13 +139,15 @@ class TLDetector(object):
             stop_pose.pose.position.x = stop_line_positions[i][0]
             stop_pose.pose.position.y = stop_line_positions[i][1]
             stop_pose.pose.position.z = 0
-            waypoint_idx = self.get_closest_waypoint(stop_pose)
+            waypoint_idx = self.get_closest_waypoint(stop_pose, force_search=True)
             # compensate for the +1 in the get_closes_waypoint method
             waypoint_idx = (waypoint_idx - 1 + self.total_waypoints) % self.total_waypoints
             waypoints.append(waypoint_idx)
+
+        self._log('light waypoints {}'.format(waypoints), True)
         return waypoints
 
-    def get_closest_waypoint(self, pose, start_idx=0):
+    def get_closest_waypoint(self, pose, start_idx=0, force_search=False):
         """Identifies the closest path waypoint to the given position
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
@@ -171,7 +169,8 @@ class TLDetector(object):
                 minidx = idx
                 mindl = dist
             else:
-                break
+                if not force_search:
+                    break
 
         minidx = (minidx + 1) % self.total_waypoints
         return minidx
@@ -206,8 +205,11 @@ class TLDetector(object):
             d_wp = self.traffic_light_wps[i] - curr_i
             self._log('Stop Light {} d {} curr_wp {}'.format(i, d_wp, curr_i))
             if 0 <= d_wp < self.stop_zone_wp:
-                self._log('In Zone Stop Light {} light wp {} car wp {}'.format(i, self.traffic_light_wps[i], curr_i), True)
+                if self.log_flag:
+                    self._log('In Zone Stop Light {} light wp {} car wp {}'.format(i, self.traffic_light_wps[i], curr_i), True)
+                    self.log_flag = False
                 return self.traffic_light_wps[i], True
+            self.log_flag = True
         return -1, False
 
     def get_lookup_traffic_lights(self, light_wp):
@@ -254,7 +256,11 @@ class TLDetector(object):
             return self.get_lookup_traffic_lights(light_wp)
         else:
             #Get classification
-            return self.light_classifier.get_classification(self.cv_image)
+            if self.tldetect_flag:
+                self.prev_tl_state = self.light_classifier.get_classification(self.cv_image)
+
+            self.tldetect_flag = not self.tldetect_flag
+            return self.prev_tl_state
 
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
@@ -283,6 +289,7 @@ class TLDetector(object):
 
         if light:
             state = self.get_light_state(light_wp)
+            self._log('flag {}, state {}'.format(self.tldetect_flag, state))
             if state == TrafficLight.YELLOW:
                 state = TrafficLight.RED
             return light_wp, state
