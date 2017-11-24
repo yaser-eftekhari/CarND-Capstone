@@ -1,6 +1,7 @@
 Header header
 geometry_msgs/PoseStamped pose
 uint8 state
+int32 waypoint_idx
 
 uint8 UNKNOWN=4
 uint8 GREEN=2
