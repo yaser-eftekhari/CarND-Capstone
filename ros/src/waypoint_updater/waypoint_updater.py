@@ -55,7 +55,38 @@ class WaypointUpdater(object):
 
         sys.stdout.flush()
         rospy.spin()
-    
+
+    # optimized search used in tl_detector
+    def get_closest_waypoint(self, pose, start_idx=0, max_dist=0):
+        """Identifies the closest path waypoint to the given position
+            https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
+        Args:
+            pose (Pose): position to match a waypoint to
+
+        Returns:
+            int: index of the closest waypoint in self.waypoints
+
+        """
+        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
+        mindl = 10000000
+        minidx = -1
+        idx = start_idx
+        dist_sum = 0
+        #optimize to binary search TBD
+        for a_idx in range(len(self.base_wp_list)):
+            last_idx = idx
+            idx = (a_idx + start_idx) % len(self.base_wp_list) 
+            dist = dl(pose.pose.position, self.base_wp_list[idx].pose.pose.position)
+            dist_sum += dl(self.base_wp_list[last_idx].pose.pose.position, self.base_wp_list[idx].pose.pose.position)
+            if mindl > dist:
+                minidx = idx
+                mindl = dist
+                if mindl<2.:
+                    break
+            if max_dist>0 and dist_sum>max_dist:
+                return -1
+        minidx = (minidx + 1) % len(self.base_wp_list)
+        return minidx    
 
     def get_base_idx(self, curr_pose):
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
@@ -90,12 +121,13 @@ class WaypointUpdater(object):
             i = idx % len(self.base_wp_list)
             wp = deepcopy(self.base_wp_list[i])
             if self.loopEnable and self.base_wp_list[i].twist.twist.linear.x==0:
-                self.base_wp_list[i].twist.twist.linear.x = 1. # avoid stopping the car with 0 target velocity if loop enabled
+                self.base_wp_list[i].twist.twist.linear.x = 2. # avoid stopping the car with 0 target velocity if loop enabled
             if self.red_light_wp != -1:
                 if idx >= self.red_light_wp:
                     wp.twist.twist.linear.x = 0
                 else:
-                    wp.twist.twist.linear.x = max(2, self.base_wp_list[self.detect_red_wp].twist.twist.linear.x - 
+                    # set minimum speed to 5 to avoid slowly down too much before TL and avoid 2 stops.
+                    wp.twist.twist.linear.x = max(5, self.base_wp_list[self.detect_red_wp].twist.twist.linear.x - 
                                                     (i - self.detect_red_wp )* self.base_wp_list[self.detect_red_wp].twist.twist.linear.x
                                                                 /max(1, (self.red_light_wp -1 - self.detect_red_wp )) )
 
@@ -122,10 +154,11 @@ class WaypointUpdater(object):
         #ynew = interpolate.splev(xnew, tck, der=0)
         self.final_waypoints_pub.publish(final_wp)
         '''
-        curr_i = self.get_base_idx(self.curr_pose)
+        #curr_i = self.get_base_idx(self.curr_pose)
+        curr_i = self.get_closest_waypoint(self.curr_pose, start_idx=self.curr_pose_wp)
         self.curr_pose_wp = curr_i
         lookahead_dist = max(1.5* self.get_waypoint_velocity(self.base_wp_list[curr_i]), 15)
-        off_i = self.get_base_off_idx(curr_i, lookahead_dist) # 60m gets more points. TBD Spline
+        off_i = self.get_base_off_idx(curr_i, lookahead_dist) # 15m gets more points. TBD Spline
         final_wp = self.get_rough_path(self.curr_pose, curr_i, off_i)
         self.final_waypoints_pub.publish(final_wp)
 
