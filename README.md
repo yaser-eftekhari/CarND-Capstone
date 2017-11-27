@@ -1,7 +1,7 @@
 This is the project repo for the final project of Team RoadWeavers  
 
 * Team Lead: Harish Balasubramaniam (harish.balasub@gmail.com), 
-* Team Member 1: Yaser Eftekhari (yaser.eftekhari@gmail.com), 
+* Team Member 1: Yaser Eftekhari (yasseref@yahoo.com, yaser.eftekhari@gmail.com), 
 * Team Member 2: Sean Robinson (sean.robinson36@gmail.com), 
 * Team Member 3: Tharak Krishnan (tharak.krishnan@gmail.com)   
 
