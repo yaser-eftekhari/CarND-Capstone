@@ -51,7 +51,7 @@ class WaypointUpdater(object):
         self.curr_speed = 30
         self.red_light_wp = -1
         self.prev_red_light_wp = -1
-        self.loopEnable = True
+        self.loopEnable = False
 
         sys.stdout.flush()
         rospy.spin()
@@ -126,8 +126,8 @@ class WaypointUpdater(object):
                 if idx >= self.red_light_wp:
                     wp.twist.twist.linear.x = 0
                 else:
-                    # set minimum speed to 5 to avoid slowly down too much before TL and avoid 2 stops.
-                    wp.twist.twist.linear.x = max(5, self.base_wp_list[self.detect_red_wp].twist.twist.linear.x - 
+                    # set minimum speed to 4 to avoid slowly down too much before TL and avoid 2 stops.
+                    wp.twist.twist.linear.x = max(4, self.base_wp_list[self.detect_red_wp].twist.twist.linear.x - 
                                                     (i - self.detect_red_wp )* self.base_wp_list[self.detect_red_wp].twist.twist.linear.x
                                                                 /max(1, (self.red_light_wp -1 - self.detect_red_wp )) )
 
