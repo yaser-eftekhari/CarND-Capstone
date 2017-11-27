@@ -10,7 +10,7 @@ from light_classification.tl_classifier import TLClassifier
 import tf
 import cv2
 import yaml
-from os.path import exists  
+from os.path import exists
 from os import makedirs, remove
 from glob import glob
 import math
@@ -64,7 +64,7 @@ class TLDetector(object):
         self.useTrafficLightsDebugEnable = False
         self.saveImgEnable = False
         self.saveImgCount = self.saveRecCount = 0
-        self.saveImgRate = 10 # images are sent 10 times a second. rate=10 saves 1 per second.    
+        self.saveImgRate = 10 # images are sent 10 times a second. rate=10 saves 1 per second.
         self.imgDir = './img'
         if self.saveImgEnable:
             if not exists(self.imgDir):
@@ -72,7 +72,7 @@ class TLDetector(object):
             else:
                 for name in glob(self.imgDir+"/*"):
                    remove(name)
-        
+
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
@@ -120,7 +120,7 @@ class TLDetector(object):
         """
         self.has_image = True
         self.camera_image = msg
-        self.cv_image = self.bridge.imgmsg_to_cv2(msg, "bgr8")
+        self.cv_image = self.bridge.imgmsg_to_cv2(msg, "rgb8")
 
         light_wp, state = self.process_traffic_lights()
 
