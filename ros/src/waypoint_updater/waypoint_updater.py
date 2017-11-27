@@ -22,7 +22,6 @@ TODO (for Yousuf and Aaron): Stopline location for each traffic light.
 
 LOOKAHEAD_WPS = 20 # Number of waypoints we will publish. You can change this number
 
-
 def clone_waypoint(wp, vel):
     output = Waypoint()
 
@@ -48,13 +47,9 @@ class WaypointUpdater(object):
         rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
 
-        # TODO: Add a subscriber for /traffic_waypoint and /obstacle_waypoint below
+        # Adding subscriber for /traffic_waypoint and /obstacle_waypoint below
         rospy.Subscriber('/traffic_waypoint', TrafficLight , self.traffic_cb)
-        # rospy.Subscriber('/traffic_waypoint', Int32 , self.traffic_cb)
         rospy.Subscriber('/obstacle_waypoint', Lane, self.obstacle_cb)
-
-        # Adding Current velocity as well to be used to calculate the speed for final waypoints
-        rospy.Subscriber('/current_velocity', TwistStamped, self.curr_vel_cb)
 
         self.final_waypoints_pub = rospy.Publisher('/final_waypoints', Lane, queue_size=1)
 
@@ -67,17 +62,17 @@ class WaypointUpdater(object):
 
         self.total_base_wp = None
         self.prev_base_wp = None
-        self.curr_speed = None
 
         self.new_pose = False
         self.new_traffic = False
 
         self.stop_zone_wp = 3
+        self.warning_zone = 40
 
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(10) # 20Hz
+        rate = rospy.Rate(10) # 10Hz
         while not rospy.is_shutdown():
             if self.new_pose or self.new_traffic:
                 self.new_pose = False
@@ -117,7 +112,13 @@ class WaypointUpdater(object):
 
         self._log('current index {} end index {}'.format(curr_i, off_i))
 
-        final_wps = self.adjust_speed(self.base_wp_list[curr_i:off_i])
+        if off_i >= self.total_base_wp:
+            arr = self.base_wp_list[curr_i:self.total_base_wp]
+            arr.extend(self.base_wp_list[0:off_i - self.total_base_wp])
+        else:
+            arr = self.base_wp_list[curr_i:off_i]
+
+        final_wps = self.adjust_speed(arr)
 
         path.waypoints = final_wps
 
@@ -134,7 +135,7 @@ class WaypointUpdater(object):
             return original_wp
 
         # Traffic light is too far from now
-        if distance_wp >= LOOKAHEAD_WPS:
+        if distance_wp >= self.warning_zone:
             return original_wp
 
         # Traffic light is fast approaching
@@ -217,9 +218,6 @@ class WaypointUpdater(object):
     def obstacle_cb(self, msg):
         # Callback for /obstacle_waypoint message. We will implement it later
         pass
-
-    def curr_vel_cb(self, msg):
-        self.curr_speed = msg.twist.linear.x
 
 
 if __name__ == '__main__':
