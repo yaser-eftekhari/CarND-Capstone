@@ -61,7 +61,7 @@ class TLDetector(object):
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(7) # 5Hz
+        rate = rospy.Rate(7) # 7Hz
         while not rospy.is_shutdown():
             if self.new_pose and self.new_image:
                 self.new_pose = False
@@ -71,6 +71,12 @@ class TLDetector(object):
             rate.sleep()
 
     def pose_cb(self, msg):
+        """Callback function for when a car position is received
+
+        Args:
+            msg (current_pose): position of the car
+
+        """
         pose = msg
         if self.waypoints_cached:
             self.last_car_position = self.get_closest_waypoint(pose, start_idx=self.last_car_position)
@@ -79,6 +85,13 @@ class TLDetector(object):
             self.new_pose = True
 
     def waypoints_cb(self, waypoints):
+        """Callback function for when all waypoints are received at the beginning of time.
+        This function also starts the classifier on tensorflow. It also gets the waypoints associated to the traffic lights
+
+        Args:
+            waypoints (base_waypoints): array of all waypoints on the track
+
+        """
         self.waypoints = waypoints.waypoints
         self.total_waypoints = len(self.waypoints)
         self.traffic_light_wps = self.get_traffic_light_waypoints(self.config['stop_line_positions'])
@@ -87,8 +100,7 @@ class TLDetector(object):
         self._log('{} Waypoints received'.format(len(self.waypoints)))
 
     def image_cb(self, msg):
-        """Identifies red lights in the incoming camera image and publishes the index
-            of the waypoint closest to the red light's stop line to /traffic_waypoint
+        """Callback function for when an image is received
 
         Args:
             msg (Image): image from car-mounted camera
@@ -98,6 +110,12 @@ class TLDetector(object):
         self.new_image = True
 
     def get_traffic_light_waypoints(self, stop_line_positions):
+        """Find the closest waypoint to each traffic light
+
+        Args:
+            stop_line_positions : coordinates of the lights provided by the simulator
+
+        """
         waypoints = []
         stop_pose = PoseStamped()
         for i in range(len(stop_line_positions)):
@@ -117,6 +135,8 @@ class TLDetector(object):
             https://en.wikipedia.org/wiki/Closest_pair_of_points_problem
         Args:
             pose (Pose): position to match a waypoint to
+            start_idx : index of the previously found waypoint. This is used to speed up the search
+            force_search: to force the search over all waypoints
 
         Returns:
             int: index of the closest waypoint in self.waypoints
@@ -142,6 +162,12 @@ class TLDetector(object):
 
     # def get_closest_tl_stop(self, curr_i, stop_line_positions):
     def get_closest_tl_stop(self, curr_i):
+        """Identify the closest traffic light and its state based on the distance to the car
+
+        Args:
+            curr_i : current position of the car in waypoint scale
+
+        """
         for i in range(len(self.traffic_light_wps)):
             d_wp = self.traffic_light_wps[i] - curr_i
             self._log('Stop Light {} d {} curr_wp {}'.format(i, d_wp, curr_i))
@@ -156,10 +182,6 @@ class TLDetector(object):
     def process_traffic_lights(self):
         """Finds closest visible traffic light, if one exists, and determines its
             location and color
-
-        Returns:
-            int: index of waypoint closes to the upcoming stop line for a traffic light (-1 if none exists)
-            int: ID of traffic light color (specified in styx_msgs/TrafficLight)
 
         """
         # List of positions that correspond to the line to stop in front of for a given intersection

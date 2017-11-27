@@ -4,8 +4,6 @@ import rospy
 from std_msgs.msg import Bool
 from dbw_mkz_msgs.msg import ThrottleCmd, SteeringCmd, BrakeCmd, SteeringReport
 from geometry_msgs.msg import TwistStamped
-import math
-from copy import copy, deepcopy
 from twist_controller import Controller
 
 '''
@@ -59,14 +57,15 @@ class DBWNode(object):
 
         # Create `TwistController` object
         min_speed = 25/2.24
-        self.controller = Controller(wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle) #<Arguments you wish to provide>)
+        self.controller = Controller(wheel_base, steer_ratio, min_speed, max_lat_accel, max_steer_angle)
 
         self.logEnable = False
         self.dbw_enabled = False
         self.target_ang_vel = 0
         self.target_lin_vel = 0.
         self.current_lin_vel = 0.
-        # Subscribe to all the topics you need to
+
+        # Subscribe to all needed topics
         rospy.Subscriber('/vehicle/dbw_enabled', Bool, self.dbw_enabled_cb)
         rospy.Subscriber('/twist_cmd', TwistStamped, self.twist_cb)
         rospy.Subscriber('/current_velocity', TwistStamped, self.curr_vel_cb)

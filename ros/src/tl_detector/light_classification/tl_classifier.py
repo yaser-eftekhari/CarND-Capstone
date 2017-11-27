@@ -1,8 +1,6 @@
 import rospy
-# import math
 import tensorflow as tf
 import numpy as np
-# import cv2
 from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
@@ -14,13 +12,10 @@ class TLClassifier(object):
         self.logEnable = False
 
         PATH_TO_MODEL = 'light_classification/ssd-sim.pb'
-        # PATH_TO_MODEL = 'light_classification/ssd.pb'
-        # PATH_TO_MODEL = 'light_classification/rfcn.pb' #slow
-        # PATH_TO_MODEL = 'light_classification/faster_rcnn.pb' #too slow
+        # PATH_TO_MODEL = 'light_classification/ssd-site.pb'
         self.detection_graph = tf.Graph()
         with self.detection_graph.as_default():
             od_graph_def = tf.GraphDef()
-            # Works up to here.
             with tf.gfile.GFile(PATH_TO_MODEL, 'rb') as fid:
                 serialized_graph = fid.read()
                 od_graph_def.ParseFromString(serialized_graph)
@@ -52,7 +47,6 @@ class TLClassifier(object):
 
         s_scores = np.squeeze(scores)
         s_classes = np.squeeze(classes)
-        # s_boxes = np.squeeze(boxes)
 
         useful_idx = np.where(s_scores > 0.5)
 
@@ -75,48 +69,3 @@ class TLClassifier(object):
 
         self._log('___UNKNOWN___')
         return TrafficLight.UNKNOWN
-
-        # useful_idx = np.where((s_scores > 0.5) & (s_classes == 10))
-        # if len(useful_idx) == 0:
-        #     return TrafficLight.UNKNOWN
-        #
-        # useful_box = s_boxes[useful_idx]
-        #
-        # h, w, _ = image.shape
-        #
-        # # rospy.logwarn('w {}, h {}'.format(w, h))
-        #
-        # sums = np.zeros(3, np.uint8)
-        # mask = np.zeros([h, w], np.uint8)
-        # for box in useful_box:
-        #     y_lt = int(math.floor(h * box[0]))
-        #     x_lt = int(math.floor(w * box[1]))
-        #     y_rb = int(math.floor(h * box[2]))
-        #     x_rb = int(math.floor(w * box[3]))
-        #     mask[y_lt:y_rb, x_lt:x_rb] = 255
-        #
-        # color = ('b', 'g', 'r')
-        # for i, col in enumerate(color):
-        #     hist_mask = cv2.calcHist([image], [i], mask, [256], [0, 256])
-        #     sums[i] = sum(hist_mask[200:256])
-        #
-        # # rospy.logwarn('sums {}'.format(sums))
-        #
-        # # This is the ratio of green over red
-        # ratio = sums[1] * 1.0 / max(sums[2], 1.0)
-        #
-        # if ratio > 10:
-        #     self._log('___GREEN___ {}'.format(ratio))
-        #     return TrafficLight.GREEN
-        #
-        # if ratio < 0.3:
-        #     self._log('___RED___ {}'.format(ratio))
-        #     return TrafficLight.RED
-        #
-        # if 0.6 < ratio < 1.5:
-        #     self._log('___YELLOW___ {}'.format(ratio))
-        #     return TrafficLight.YELLOW
-        #
-        # self._log('___UNKNOWN___ {}'.format(ratio))
-        #
-        # return TrafficLight.UNKNOWN
