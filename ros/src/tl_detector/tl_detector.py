@@ -37,16 +37,17 @@ class TLDetector(object):
 
         config_string = rospy.get_param("/traffic_light_config")
         self.config = yaml.load(config_string)
+        self.stop_line_positions = self.config['stop_line_positions']
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        self.light_classifier = TLClassifier((len(self.stop_line_positions)==1))
         self.listener = tf.TransformListener()
 
-        self.logEnable = True
+        self.logEnable = False
         self.useTrafficLightsDebugEnable = False
-        self.saveImgEnable = True
+        self.saveImgEnable = False
         self.saveImgCount = self.saveRecCount = 0
         self.saveImgRate = 10 # images are sent 10 times a second. rate=10 saves 1 per second.    
         self.imgDir = './img'
@@ -95,7 +96,6 @@ class TLDetector(object):
 
     def waypoints_cb(self, waypoints):
         self.waypoints = waypoints.waypoints
-        self.stop_line_positions = self.config['stop_line_positions']
         self.stop_line_wp = []
         stop_pose = PoseStamped()
         for i in range(len(self.stop_line_positions)):

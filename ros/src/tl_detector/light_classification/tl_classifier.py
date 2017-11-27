@@ -10,10 +10,16 @@ class TLClassifier(object):
         if self.logEnable or force:
             rospy.logwarn(msg)
 
-    def __init__(self):
-        self.logEnable = True
+    def __init__(self, site=False):
+        self.logEnable = False
 
-        PATH_TO_MODEL = 'light_classification/ssd-sim.pb'
+        self.siteFlag = site
+        if self.siteFlag:
+            self._log('Selecting Model for classification at Site', force=True)
+            PATH_TO_MODEL = 'light_classification/ssd-site.pb'
+        else:
+            self._log('Selecting Model for classification in simulator', force=True)
+            PATH_TO_MODEL = 'light_classification/ssd-sim.pb'
         # PATH_TO_MODEL = 'light_classification/rfcn.pb' #slow
         # PATH_TO_MODEL = 'light_classification/faster_rcnn.pb' #too slow
         self.detection_graph = tf.Graph()
@@ -68,9 +74,12 @@ class TLClassifier(object):
             if s_scores[idx] > 0.1 and s_boxes[idx][1] < left_most_x:
                 left_most_x = s_boxes[idx][1]
                 left_idx = idx
-        if max_score > .8:
+
+        if self.siteFlag and max_score > .2:
             best_class = s_classes[max_idx]
-        elif left_idx != -1:
+        elif not self.siteFlag and max_score > .8:
+            best_class = s_classes[max_idx]
+        elif not self.siteFlag and left_idx != -1:
             best_class = s_classes[left_idx]
         
         if best_class == 1:
