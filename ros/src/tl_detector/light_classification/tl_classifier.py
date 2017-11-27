@@ -1,8 +1,8 @@
 import rospy
-import math
+# import math
 import tensorflow as tf
 import numpy as np
-import cv2
+# import cv2
 from styx_msgs.msg import TrafficLight
 
 class TLClassifier(object):
@@ -52,7 +52,7 @@ class TLClassifier(object):
 
         s_scores = np.squeeze(scores)
         s_classes = np.squeeze(classes)
-        s_boxes = np.squeeze(boxes)
+        # s_boxes = np.squeeze(boxes)
 
         useful_idx = np.where(s_scores > 0.5)
 

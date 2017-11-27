@@ -35,8 +35,8 @@ class Controller(object):
         else:
             break_pid = 0
             # When starting from rest, have a lower throttle speed
-            if current_lin_vel < 2.:
-                throttle_pid = .5
+            if current_lin_vel < 4.:
+                throttle_pid = .4
             else:
                 throttle_pid = 1 - abs(steer_pid)
         return throttle_pid, break_pid, steer_pid #target_ang_vel

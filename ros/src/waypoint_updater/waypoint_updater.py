@@ -36,6 +36,7 @@ def clone_waypoint(wp, vel):
 
     return output
 
+
 class WaypointUpdater(object):
     def _log(self, msg, force_enable = False):
         if force_enable or self.logEnable:
@@ -76,7 +77,7 @@ class WaypointUpdater(object):
         self.loop()
 
     def loop(self):
-        rate = rospy.Rate(20) # 20Hz
+        rate = rospy.Rate(10) # 20Hz
         while not rospy.is_shutdown():
             if self.new_pose or self.new_traffic:
                 self.new_pose = False
@@ -116,15 +117,6 @@ class WaypointUpdater(object):
 
         self._log('current index {} end index {}'.format(curr_i, off_i))
 
-        # final_wps = []
-
-        # for idx in range(curr_i, off_i):
-        #     i = idx % self.total_base_wp
-        #     wp = clone_waypoint(self.base_wp_list[i])
-        #
-        #     final_wps.append(wp)
-
-        # self.adjust_speed(final_wps)
         final_wps = self.adjust_speed(self.base_wp_list[curr_i:off_i])
 
         path.waypoints = final_wps
