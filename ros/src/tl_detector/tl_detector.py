@@ -92,9 +92,22 @@ class TLDetector(object):
         rospy.spin()
 
     def pose_cb(self, msg):
+        """Callback function for when a car position is received
+
+        Args:
+            msg (current_pose): position of the car
+
+        """
         self.pose = msg
 
     def waypoints_cb(self, waypoints):
+        """Callback function for when all waypoints are received at the beginning of time.
+        This function also gets the waypoints associated to the traffic lights
+
+        Args:
+            waypoints (base_waypoints): array of all waypoints on the track
+
+        """
         self.waypoints = waypoints.waypoints
         self.stop_line_wp = []
         stop_pose = PoseStamped()
@@ -106,6 +119,12 @@ class TLDetector(object):
         self._log('Stop line wps: {}'.format(self.stop_line_wp))
 
     def traffic_cb(self, msg):
+        """Callback function for traffic lights. This information is only used in the debug state
+
+        Args:
+            msg (current_pose): position of the car
+
+        """
         self.lights = msg.lights
 
     def image_cb(self, msg):
@@ -172,28 +191,33 @@ class TLDetector(object):
         minidx = (minidx + 1) % len(self.waypoints)
         return minidx
 
-    def distance(self, waypoints, wp1, wp2):
-        dist = 0
-        dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2  + (a.z-b.z)**2)
-        if wp2 < wp1:
-            r = range(wp1, len(self.waypoints))
-            r.extend(range(0,wp2+1))
-        else:
-            r = range(wp1, wp2+1)
-        for i in r:
-            dist += dl(self.waypoints[wp1].pose.pose.position, self.waypoints[i].pose.pose.position)
-            wp1 = i
-        return dist
-
     def check_wp_ahead(self, wp, from_i):
+        """Determine if wp is ahead of from_i in waypoints scale
+        Args:
+            wp : First waypoint
+            from_i : Second waypoint
+
+        Returns:
+            boolean: true if wp is ahead of from_i
+
+        """
         diff = wp - from_i
         if (diff > 0 and diff < (len(self.waypoints)/2)) or (diff < 0 and abs(diff) > (len(self.waypoints)/2)):
             return True # wp is ahead of from_i
         return False
+
     def get_closest_tl_stop(self, curr_i):
+        """Finds the closest traffic light to the car and trigger the classification process only if the traffic light is close enough to the car
+        Args:
+            curr_i : location of the car
+
+        Returns:
+            int: waypoint index of the closest traffic light
+            flag: true if traffic light is close enough
+
+        """
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         
-        step = 20
         stop_pose = PoseStamped()
         for i in range(len(self.stop_line_positions)):
             stop_pose.pose.position.x = self.stop_line_positions[i][0]
@@ -217,6 +241,14 @@ class TLDetector(object):
         return -1, False
 
     def get_lookup_traffic_lights(self, light_wp):
+        """Finds the status of the traffic light ahead. Only used in debug mode
+        Args:
+            light_wp : waypoint of the traffic light ahead
+
+        Returns:
+            uint8: status of the light
+
+        """
         if light_wp == -1:
             return TrafficLight.UNKNOWN
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
@@ -300,6 +332,7 @@ class TLDetector(object):
                 state = TrafficLight.RED
             return light_wp, state
         return -1, TrafficLight.UNKNOWN
+
 
 if __name__ == '__main__':
     try:

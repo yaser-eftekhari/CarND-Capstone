@@ -89,6 +89,12 @@ class WaypointUpdater(object):
         return minidx    
 
     def get_base_idx(self, curr_pose):
+        """Finds the waypoint index corresponding to the current car location
+
+        Args:
+            curr_pose (Current Position): current position of the car
+
+        """
         dl = lambda a, b: math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2 + (a.z-b.z)**2)
         mindl = 100000000
         minidx = 0
@@ -113,6 +119,13 @@ class WaypointUpdater(object):
         return i        
 
     def get_rough_path(self, curr_pose, curr_i, off_i):
+        """Set the speed on a range of waypoints
+
+        Args:
+            curr_i (Current Position): current position of the car in waypoint scale
+            off_i : offset of waypoints from current position
+
+        """
         path = Lane()
         if off_i < curr_i:
             off_i += len(self.base_wp_list)
@@ -137,6 +150,12 @@ class WaypointUpdater(object):
     
 
     def pose_cb(self, msg):
+        """Callback function for when a car position is received
+
+        Args:
+            msg (current_pose): position of the car
+
+        """
         # Implement
         # rospy.logwarn('Got pose {}'.format(msg))
         self.curr_pose = msg
@@ -163,12 +182,24 @@ class WaypointUpdater(object):
         self.final_waypoints_pub.publish(final_wp)
 
     def waypoints_cb(self, waypoints):
+        """Callback function for when all waypoints are received at the beginning of time
+
+        Args:
+            waypoints (base_waypoints): array of all waypoints on the track
+
+        """
         # Implement
         self._log('Got waypoints_cb of size {}'.format(len(waypoints.waypoints)))
         self.base_wp_list = waypoints.waypoints
         self.traffic_wp_list = deepcopy(waypoints.waypoints)
 
     def traffic_cb(self, msg):
+        """Callback function for when a traffic signal is received
+
+        Args:
+            msg (traffic_waypoint): location and status of the upcoming traffic light
+
+        """
         # TODO: Callback for /traffic_waypoint message. Implement
         if self.red_light_wp == -1 and msg.data != -1:
             if self.prev_red_light_wp == msg.data: # dont stop at same stop twice
